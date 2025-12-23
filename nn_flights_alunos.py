@@ -123,7 +123,24 @@ que deve ser usado, os tamanhos das camadas de entrada, escondida e saída,
 o numero de epocas que deve ser considerado no treino e os tamanhos dos conjuntos de treino e 
 teste"""
 def run_fights(file, input_size, hidden_size, output_size, epochs, training_set_size, test_set_size):
-    #A definir pelos estudantes
+   # 1. Criar os conjuntos de dados
+    print("A carregar e a processar o dataset...")
+    treino, teste = build_sets(file, training_set_size, test_set_size)
+    
+    # 2. Treinar a rede
+    print(f"A iniciar treino por {epochs} épocas...")
+    rede_treinada = train_flights(input_size, hidden_size, output_size, treino, teste, epochs)
+    
+    # 3. Avaliação final com impressão detalhada
+    print("\n--- RESULTADOS FINAIS NO CONJUNTO DE TESTE ---")
+    resultados = test_flights(rede_treinada, teste, printing=True)
+    
+    print("\nResumo do Desempenho:")
+    print(f"Exatidão: {resultados['exatidão']:.2f}%")
+    print(f"Precisão: {resultados['precisão']:.2f}")
+    print(f"Cobertura (Recall): {resultados['cobertura']:.2f}")
+    print(f"F1-Score: {resultados['f1-score']:.2f}")
+    print(f"Matriz de Confusão [VP, FP, VN, FN]: {resultados['matriz']}")
     pass
 
 
@@ -138,15 +155,26 @@ e a segunda com y padrões (conjunto de teste). Atenção que x+y não pode ultr
 de estudantes disponível no dataset"""       
 def build_sets(nome_f, x, y):
     all_patterns = []
+    
     with open(nome_f, 'r') as f:
-        linha = f.readlines()
-        for i in range(1, len(linha)):
-            all_patterns.append(linha[i].split(','))
-            padrao = translate(all_patterns)
-    random.shuffle(padrao)
+        linhas = f.readlines()
+        # Começamos no 1 para saltar o cabeçalho (Month, DayOfWeek...)
+        for i in range(1, len(linhas)):
+            # 1. Limpa a linha e separa por vírgulas
+            colunas = linhas[i].strip().split(',')
+            
+            # 2. CORREÇÃO: Passar 'colunas' (a linha atual) e não 'all_patterns'
+            padrao = translate(colunas)
+            
+            # 3. Adiciona o padrão processado à lista global
+            all_patterns.append(padrao)
 
+    # Só baralhamos e dividimos DEPOIS de processar todas as linhas
+    random.shuffle(all_patterns)
+    
     treino = all_patterns[:x]
     teste = all_patterns[x:x+y]
+    
     return treino, teste
 
 """A função translate recebe cada lista de valores que caracterizam um voo
@@ -199,7 +227,34 @@ def normaliza_valores(valor, min, max):
 o conjunto de treino, os tamanhos das camadas de entrada, escondida e saída e o número 
 de épocas que irão ser usadas para fazer o treino"""
 def train_flights(input_size, hidden_size, output_size, training_set, test_set, epochs):
-    #A definir pelos estudantes
+    # Cria a rede neuronal [cite: 281]
+    net = make(input_size, hidden_size, output_size)
+    
+    historico_treino = []
+    historico_teste = []
+
+    for e in range(epochs):
+        # Baralha o treino em cada época para melhor aprendizagem [cite: 139]
+        random.shuffle(training_set)
+        
+        for padrao in training_set:
+            # Treina a rede com cada padrão [cite: 282]
+            iterate(e, net, padrao[0], padrao[2])
+            
+        # No fim de cada época, avalia o desempenho e guarda para os gráficos [cite: 306]
+        res_treino = test_flights(net, training_set, printing=False)
+        res_teste = test_flights(net, test_set, printing=False)
+        
+        historico_treino.append(res_treino['exatidão'])
+        historico_teste.append(res_teste['exatidão'])
+        
+    # Aqui poderias usar o matplotlib para desenhar os gráficos [cite: 306]
+    plt.plot(historico_treino, label="Treino")
+    plt.plot(historico_teste, label="Teste")
+    plt.legend()
+    plt.show()
+    
+    return net
     pass
 
 
@@ -210,12 +265,52 @@ deve ser comparada com a classe real,sendo contabilizado o número de respostas 
 A função calcula a percentagem de respostas corretas, 
 o nº de VP,FP,VN, FN, precisão, cobertura e f1-score""" 
 def test_flights(net, test_set, printing = True):
-    #A definir pelos estudantes
+    vp, fp, vn, fn = 0, 0, 0, 0
+    
+    for i in range(len(test_set)):
+        padrao = test_set[i]
+        entrada = padrao[0]
+        classe_real = padrao[1]
+        
+        # Faz a propagação para a frente
+        forward(net, entrada)
+        # Obtém a previsão da rede
+        previsao = retranslate(net['y'])
+        
+        if printing:
+            print(f"Voo {i}: Rede previu {previsao}, Realidade era {classe_real}")
+            
+        # Contagem para a matriz de confusão
+        if previsao == 1 and classe_real == 1: vp += 1
+        elif previsao == 1 and classe_real == 0: fp += 1
+        elif previsao == 0 and classe_real == 0: vn += 1
+        elif previsao == 0 and classe_real == 1: fn += 1
+
+    # Cálculos das métricas (evitando divisões por zero)
+    exatidao = (vp + vn) / len(test_set) * 100
+    precisao = vp / (vp + fp) if (vp + fp) > 0 else 0
+    cobertura = vp / (vp + fn) if (vp + fn) > 0 else 0
+    f1 = 2 * (precisao * cobertura) / (precisao + cobertura) if (precisao + cobertura) > 0 else 0
+
+    if printing:
+        print(f"Success rate: {exatidao:.2f}%")
+
+    return {
+        "exatidão": exatidao,
+        "matriz": [vp, fp, vn, fn],
+        "precisão": precisao,
+        "cobertura": cobertura,
+        "f1-score": f1
+    }
     pass
   
 """Recebe o padrao de saida da rede e devolve a situação de atraso do voo.
 A situação de atraso corresponde ao indice da saida com maior valor."""  
 def retranslate(out):
+    if out[0] > out[1]:
+        return 0
+    else:
+        return 1
     pass
 
 if __name__ == "__main__":
@@ -230,10 +325,16 @@ if __name__ == "__main__":
               %(rede_AND['y'], linha[0], linha[1], tabela_verdade[linha]))
         
 
-"""if __name__ == "__main__":
-    input_size, hidden_size, output_size = 18, 5, 2
-    epochs = 5
+if __name__ == "__main__":
+    # Parâmetros base do enunciado
+    # input_size depende do teu One-Hot (Ex: 4 numéricos + 5 carriers + 8 origens + 8 destinos = 25)
+    # Ajusta este valor de acordo com o tamanho final do teu vetor no translate
+    input_size = 25 
+    hidden_size = 8
+    output_size = 2
+    epochs = 50
     training_set_size = 800
     test_set_size = 200
     file = 'DataSet1.csv'
-    run_flights(file, input_size, hidden_size, output_size, epochs, training_set_size, test_set_size)"""
+    
+    run_fights(file, input_size, hidden_size, output_size, epochs, training_set_size, test_set_size)
