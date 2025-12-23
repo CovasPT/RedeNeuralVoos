@@ -132,15 +132,15 @@ def run_fights(file, input_size, hidden_size, output_size, epochs, training_set_
     rede_treinada = train_flights(input_size, hidden_size, output_size, treino, teste, epochs)
     
     # 3. Avaliação final com impressão detalhada
-    print("\n--- RESULTADOS FINAIS NO CONJUNTO DE TESTE ---")
-    resultados = test_flights(rede_treinada, teste, printing=True)
-    
+    print("\n--- RESULTADOS FINAIS NO CONJUNTO DE TESTE ---") 
     print("\nResumo do Desempenho:")
     print(f"Exatidão: {resultados['exatidão']:.2f}%")
     print(f"Precisão: {resultados['precisão']:.2f}")
     print(f"Cobertura (Recall): {resultados['cobertura']:.2f}")
     print(f"F1-Score: {resultados['f1-score']:.2f}")
     print(f"Matriz de Confusão [VP, FP, VN, FN]: {resultados['matriz']}")
+    test_flights(rede_treinada, teste, printing=True)
+    
     pass
 
 
@@ -288,20 +288,17 @@ def test_flights(net, test_set, printing = True):
 
     # Cálculos das métricas (evitando divisões por zero)
     exatidao = (vp + vn) / len(test_set) * 100
+    # Precisão
     precisao = vp / (vp + fp) if (vp + fp) > 0 else 0
+    # Cobertura (Recall)
     cobertura = vp / (vp + fn) if (vp + fn) > 0 else 0
+    # F1-Score
     f1 = 2 * (precisao * cobertura) / (precisao + cobertura) if (precisao + cobertura) > 0 else 0
-
+    
     if printing:
         print(f"Success rate: {exatidao:.2f}%")
-
-    return {
-        "exatidão": exatidao,
-        "matriz": [vp, fp, vn, fn],
-        "precisão": precisao,
-        "cobertura": cobertura,
-        "f1-score": f1
-    }
+        # Imprime os restantes valores aqui
+    return {"exatidão": exatidao, "matriz": [vp, fp, vn, fn], "precisão": precisao, "cobertura": cobertura, "f1-score": f1} 
     pass
   
 """Recebe o padrao de saida da rede e devolve a situação de atraso do voo.
